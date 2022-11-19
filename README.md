@@ -18,6 +18,8 @@ All thanks goes to those people and websites which I will mention here:
 [NAudio Suggestion for mic recording](https://stackoverflow.com/questions/30099459/record-live-audio-from-mic-input-and-save-simultanously)  
 [Another NAudio Suggestion](https://stackoverflow.com/questions/17982468/naudio-record-sound-from-microphone-then-save)  
 [Record Windows' System Sounds](https://ourcodeworld.com/articles/read/702/how-to-record-the-audio-from-the-sound-card-system-audio-with-c-using-naudio-in-winforms)  
+[Create new Bitmap from Bitmap C#](https://stackoverflow.com/questions/43039099/creating-a-completely-new-copy-of-bitmap-from-a-bitmap-in-c-sharp)
+[Helpful guide for using SharpDX in taking screenshots](https://stackoverflow.com/questions/6812068/c-sharp-which-is-the-fastest-way-to-take-a-screen-shot)
 ## Support
 You can support me by starring this repository if you liked the progress, and join the development by forking it and showing me your work!  
 Don't forget to share so everyone can use it 💝

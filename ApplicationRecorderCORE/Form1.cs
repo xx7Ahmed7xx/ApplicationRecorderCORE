@@ -3,13 +3,18 @@ using System.Diagnostics;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Runtime.Serialization.Formatters.Binary;
+using System.Runtime.Serialization;
 
 namespace ApplicationRecorderCORE
 {
     public partial class Form1 : Form
     {
-        List<Bitmap> allPictures= new List<Bitmap>();
+        List<MemoryStream> allStreams = new List<MemoryStream>();
         bool isRecording = false;
+
+        // SharpDX instance
+        ScreenStateLogger screenstatelogger;
 
         // Microphone Output
         public WaveInEvent micWaveSource;
@@ -31,7 +36,7 @@ namespace ApplicationRecorderCORE
         }
 
         // Start
-        private void button1_Click(object sender, EventArgs e)
+        private async void button1_Click(object sender, EventArgs e)
         // Test Chrome handle: 0x208E0
         {
             isRecording= true;
@@ -46,20 +51,31 @@ namespace ApplicationRecorderCORE
             {
                 File.Delete(directoryFile);
             }
-            /*string[] directoryFiles3 = Directory.GetFiles(Directory.GetParent(Environment.ProcessPath).FullName, "*.mp4");
+            string[] directoryFiles3 = Directory.GetFiles(Directory.GetParent(Environment.ProcessPath).FullName, "*.mp4");
             foreach (string directoryFile in directoryFiles3)
             {
-                File.Delete(directoryFile);
-            }*/
+                if (new FileInfo(directoryFile).Name == frmVideoPath)
+                    File.Delete(directoryFile);
+            }
             MessageBox.Show("Recording is ready, Press OK button to begin.", "Alert!", MessageBoxButtons.OK);
             Task.Run(
                 () => RecordFrames(frmWindHandle));
+            //Thread rcrdFrm = new Thread(
+            //    () => RecordFrames(frmWindHandle));
             Task.Run(
                 () => RecordingBeing());
+            //Thread rcrdSnd = new Thread(
+            //    () => RecordingBeing());
+            //rcrdFrm.Start();
+            //rcrdSnd.Start();
         }
 
         private void RecordingBeing()
         {
+            //Thread sysT = new Thread(
+            //    () => SysRecordSound());
+            //Thread micT = new Thread(
+            //    () => MicRecordSound());
             if (radioButton1.Checked)
             {
                 SysRecordSound();
@@ -70,8 +86,8 @@ namespace ApplicationRecorderCORE
             }
             else if (radioButton3.Checked)
             {
-                Task.Run(() => MicRecordSound());
-                Task.Run(() => SysRecordSound());
+                SysRecordSound();
+                MicRecordSound();
             }
         }
 
@@ -155,22 +171,16 @@ namespace ApplicationRecorderCORE
             int i = 0;
             if (checkBox1.Checked)
             {
-                Thread job = new Thread(() =>
+                string parentPath = Directory.GetParent(Environment.ProcessPath).FullName + "\\";
+                //Thread job = new Thread(() =>
+                //{
+                Rectangle bounds = Screen.GetBounds(Point.Empty);
+                using (Bitmap bmp = new Bitmap(bounds.Width, bounds.Height))
                 {
-                    Rectangle bounds = Screen.GetBounds(Point.Empty);
-                    using (Bitmap bitmap = new Bitmap(bounds.Width, bounds.Height))
-                    {
-                        using (Graphics g = Graphics.FromImage(bitmap))
-                        {
-                            while (isRecording)
-                            {
-                                g.CopyFromScreen(Point.Empty, Point.Empty, bounds.Size);
-                                bitmap.Save($"{i++}.png", ImageFormat.Png);
-                            }
-                        }
-                    }
-                });
-                job.Start();
+                    GetScreenPicture(bmp, bounds, i++, parentPath);
+                }
+                //});
+                //job.Start();
             }
             else
             {
@@ -180,6 +190,21 @@ namespace ApplicationRecorderCORE
                 }
             }
             
+        }
+
+        private void GetScreenPicture(Bitmap bmp, Rectangle bounds, int indexer, string ParentPath)
+        {
+            //using (Graphics g = Graphics.FromImage(bmp))
+            //{
+            //    g.CopyFromScreen(Point.Empty, Point.Empty, bounds.Size);
+            //}
+            //bmp.Save(ParentPath + $"{indexer}.png", ImageFormat.Png);
+            screenstatelogger = new ScreenStateLogger();
+            screenstatelogger.ScreenRefreshed += (sender, data) =>
+            {
+                //new frame in data
+            };
+            screenstatelogger.Start(allStreams);
         }
 
         // Stop
@@ -194,23 +219,77 @@ namespace ApplicationRecorderCORE
             {
                 sysWaveSource.StopRecording();
             }
+            screenstatelogger.Stop();
             SaveFullVideo(frmVideoPath, frmFrameRate);
+        }
+
+        public static T Clone<T>(T source)
+        {
+            if (!typeof(T).IsSerializable)
+            {
+                throw new ArgumentException("The type must be serializable.", "source");
+            }
+
+            // Don't serialize a null object, simply return the default for that object
+            if (Object.ReferenceEquals(source, null))
+            {
+                return default(T);
+            }
+
+            IFormatter formatter = new BinaryFormatter();
+            Stream stream = new MemoryStream();
+            using (stream)
+            {
+                formatter.Serialize(stream, source);
+                stream.Seek(0, SeekOrigin.Begin);
+                return (T)formatter.Deserialize(stream);
+            }
+        }
+
+        private static ImageCodecInfo GetEncoderInfo(String mimeType)
+        {
+            int j;
+            ImageCodecInfo[] encoders;
+            encoders = ImageCodecInfo.GetImageEncoders();
+            for (j = 0; j < encoders.Length; ++j)
+            {
+                if (encoders[j].MimeType == mimeType)
+                    return encoders[j];
+            }
+            return null;
         }
 
         private void SaveFullVideo(string videoPath, int frameRate)
         {
-            Thread.Sleep(1000);
-            // .\ffmpeg -framerate 30 -pattern_type sequence -i D:\tempPic\X_%d.png -c:v libx264 -pix_fmt yuv420p out.mp4
+            string parentPath = Directory.GetParent(Environment.ProcessPath).FullName + "\\";
+            // Wait for pending operations.
+            Thread.Sleep(500);
+            // Write Images so ffmpeg can use them.
+            //var EncoderParamaters = new EncoderParameters(1);
+            //EncoderParamaters.Param[0] = new EncoderParameter(Encoder.Quality, (long)90);
+            //for (int i = 0; i < allPictures.Count; i++)
+            //{
+            //    allPictures[i].Save(parentPath + $"{i}.png", GetEncoderInfo("image/png"), EncoderParamaters);
+            //}
+
+            for (int i = 0; i < allStreams.Count; i++)
+            {
+                var tempBitmap = new Bitmap(allStreams[i]);
+                tempBitmap.Save(parentPath + $"{i}.png", ImageFormat.Png);
+            }
+            allStreams.Clear();
+
+
             Process ffmpegProc = new Process();
             ffmpegProc.StartInfo.FileName = "powershell";
             ffmpegProc.StartInfo.CreateNoWindow = false;
             // Concat all wav files, incase we are recording both audios.
-            string[] wavFiles = Directory.GetFiles(Directory.GetParent(Environment.ProcessPath).FullName, "*.wav");
+            string[] wavFiles = Directory.GetFiles(parentPath, "*.wav");
             if (wavFiles.Length == 1)
             {
                 foreach (var file in wavFiles)
                 {
-                    File.Move(file, Path.Combine(Directory.GetParent(file).FullName, "output.wav"));
+                    File.Move(file, Path.Combine(parentPath, "output.wav"));
                 }
             }
             else
@@ -225,16 +304,14 @@ namespace ApplicationRecorderCORE
                 =
                 $".\\ffmpeg -framerate {frameRate} -pattern_type sequence -i '%d.png' -i 'output.wav' -c:v libx264 -pix_fmt yuv420p '{videoPath}.mp4'";
             ffmpegProc.Start();
-            // Unload..
-            allPictures.Clear();
             ffmpegProc.WaitForExit();
             // Delete previous recorded files, If found.
-            string[] directoryFiles1 = Directory.GetFiles(Directory.GetParent(Environment.ProcessPath).FullName, "*.png");
+            string[] directoryFiles1 = Directory.GetFiles(parentPath, "*.png");
             foreach (string directoryFile in directoryFiles1)
             {
                 File.Delete(directoryFile);
             }
-            string[] directoryFiles2 = Directory.GetFiles(Directory.GetParent(Environment.ProcessPath).FullName, "*.wav");
+            string[] directoryFiles2 = Directory.GetFiles(parentPath, "*.wav");
             foreach (string directoryFile in directoryFiles2)
             {
                 File.Delete(directoryFile);
@@ -274,11 +351,11 @@ namespace ApplicationRecorderCORE
         // Save Settings
         private void button3_Click(object sender, EventArgs e)
         {
-            if (textBox1.Text != "" && textBox2.Text != "" && (textBox3.Text != "" || checkBox1.Checked))
+            if (textBox1.Text.Trim() != "" && textBox2.Text.Trim() != "" && (textBox3.Text.Trim() != "" || checkBox1.Checked))
             {
                 frmFrameRate = Convert.ToInt32(textBox2.Text);
                 frmVideoPath = textBox1.Text;
-                frmWindHandle = textBox3.Text != "" ? (IntPtr)Convert.ToInt32(textBox3.Text, 16) : IntPtr.Zero;
+                frmWindHandle = textBox3.Text.Trim() != "" ? (IntPtr)Convert.ToInt32(textBox3.Text, 16) : IntPtr.Zero;
             }
         }
 
@@ -297,6 +374,15 @@ namespace ApplicationRecorderCORE
             }
         }
 
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (screenstatelogger != null)
+            {
+                screenstatelogger.Stop();
+            }
+            isRecording = false;
+            Environment.Exit(0);
+        }
     }
 
     [StructLayout(LayoutKind.Sequential)]

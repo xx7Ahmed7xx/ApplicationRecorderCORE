@@ -220,6 +220,7 @@
             this.MinimumSize = new System.Drawing.Size(517, 589);
             this.Name = "Form1";
             this.Text = "Screen-App Recorder by MrX7";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form1_FormClosing);
             this.groupBox1.ResumeLayout(false);
             this.groupBox1.PerformLayout();
             this.groupBox2.ResumeLayout(false);
