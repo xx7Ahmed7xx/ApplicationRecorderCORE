@@ -5,8 +5,8 @@ using System.Runtime.InteropServices;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Runtime.Serialization;
 using System.Runtime.ExceptionServices;
-using RecordingCORE;
 using System.Linq;
+using Helpers;
 
 namespace ApplicationRecorderCORE
 {
@@ -88,11 +88,18 @@ namespace ApplicationRecorderCORE
             if (checkBox1.Checked)
             {
                 //Recorder.StartFullScreenRecording(allStreams);
-                Recorder.StartFullScreenSimpleRecording();
+                Recorder.StartFullScreenSimpleRecording("1");
             }
             else
             {
-                Recorder.StartWindowScreenRecording(windHandle, allBitmaps);
+                foreach (var process in Process.GetProcesses())
+                {
+                    if (process.MainWindowHandle == windHandle)
+                    {
+                        Recorder.StartWindowScreenSimpleRecording(process.MainWindowTitle);
+                    }
+                }
+                //Recorder.StartWindowScreenRecording(windHandle, allBitmaps);
             }
             
         }
@@ -165,7 +172,7 @@ namespace ApplicationRecorderCORE
 
             Process ffmpegProc = new Process();
             ffmpegProc.StartInfo.FileName = "powershell";
-            ffmpegProc.StartInfo.CreateNoWindow = false;
+            ffmpegProc.StartInfo.CreateNoWindow = true;
             // Concat all wav files, incase we are recording both audios.
             string[] wavFiles = Directory.GetFiles(parentPath, "*.wav");
             if (wavFiles.Length == 1)

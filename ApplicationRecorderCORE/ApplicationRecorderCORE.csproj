@@ -15,7 +15,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\RecordingCORE\RecordingCORE.csproj" />
+    <Reference Include="Helpers">
+      <HintPath>..\..\Helpers\Helpers\bin\Debug\net6.0-windows\Helpers.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>
