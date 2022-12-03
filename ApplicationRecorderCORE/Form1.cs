@@ -1,38 +1,35 @@
 using NAudio.Wave;
 using System.Diagnostics;
 using System.Drawing.Imaging;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Runtime.Serialization;
+using System.Runtime.ExceptionServices;
+using RecordingCORE;
+using System.Linq;
 
 namespace ApplicationRecorderCORE
 {
     public partial class Form1 : Form
     {
-        List<MemoryStream> allStreams = new List<MemoryStream>();
+        List<Bitmap> allStreams = new List<Bitmap>();
+        List<Bitmap> allBitmaps = new List<Bitmap>();
         bool isRecording = false;
 
-        // SharpDX instance
-        ScreenStateLogger screenstatelogger;
-
-        // Microphone Output
-        public WaveInEvent micWaveSource;
-        // Speaker Output
-        public WasapiLoopbackCapture sysWaveSource;
         
-        // Microphone Output
-        public WaveFileWriter micWaveFile;
-        // Speaker Output
-        public WaveFileWriter sysWaveFile;
 
         int frmFrameRate = 30;
-        string frmVideoPath = "1.mp4";
-        IntPtr frmWindHandle = (IntPtr)0x208E0;
+        string frmVideoPath = "hey.mp4";
+        IntPtr frmWindHandle = (IntPtr)IntPtr.Zero;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+
+        //IntPtr hWnd = (IntPtr)FindWindow(windowName, null);
 
         public Form1()
         {
-            InitializeComponent();
+            InitializeComponent(); 
         }
 
         // Start
@@ -54,172 +51,60 @@ namespace ApplicationRecorderCORE
             string[] directoryFiles3 = Directory.GetFiles(Directory.GetParent(Environment.ProcessPath).FullName, "*.mp4");
             foreach (string directoryFile in directoryFiles3)
             {
-                if (new FileInfo(directoryFile).Name == frmVideoPath)
+                if (new FileInfo(directoryFile).Name.Contains(frmVideoPath) || new FileInfo(directoryFile).Name.Contains("1"))
                     File.Delete(directoryFile);
             }
             MessageBox.Show("Recording is ready, Press OK button to begin.", "Alert!", MessageBoxButtons.OK);
-            Task.Run(
-                () => RecordFrames(frmWindHandle));
-            //Thread rcrdFrm = new Thread(
-            //    () => RecordFrames(frmWindHandle));
-            Task.Run(
-                () => RecordingBeing());
-            //Thread rcrdSnd = new Thread(
-            //    () => RecordingBeing());
-            //rcrdFrm.Start();
-            //rcrdSnd.Start();
+            Task.Run(() => RecordFrames(frmWindHandle));
+            Task.Run(() => RecordSounds());
         }
 
-        private void RecordingBeing()
+        private void RecordSounds()
         {
-            //Thread sysT = new Thread(
-            //    () => SysRecordSound());
-            //Thread micT = new Thread(
-            //    () => MicRecordSound());
             if (radioButton1.Checked)
             {
-                SysRecordSound();
+                Recorder.StartSysSoundRecording("1.wav");
             }
             else if (radioButton2.Checked)
             {
-                MicRecordSound();
+                Recorder.StartMicSoundRecording("2.wav");
             }
             else if (radioButton3.Checked)
             {
-                SysRecordSound();
-                MicRecordSound();
+                Recorder.StartSysSoundRecording("1.wav");
+                Recorder.StartMicSoundRecording("2.wav");
             }
         }
 
-        private void SysRecordSound()
-        {
-            sysWaveSource = new WasapiLoopbackCapture();
-            sysWaveSource.WaveFormat = new WaveFormat(44100, 1);
+        
 
-            sysWaveSource.DataAvailable += new EventHandler<WaveInEventArgs>(sysWaveSource_DataAvailable);
-            sysWaveSource.RecordingStopped += new EventHandler<StoppedEventArgs>(sysWaveSource_RecordingStopped);
-
-            sysWaveFile = new WaveFileWriter("1.wav", sysWaveSource.WaveFormat);
-            sysWaveSource.StartRecording();
-        }
-
-        private void MicRecordSound()
-        {
-            micWaveSource = new WaveInEvent();
-            micWaveSource.WaveFormat = new WaveFormat(44100, 1);
-
-            micWaveSource.DataAvailable += new EventHandler<WaveInEventArgs>(micWaveSource_DataAvailable);
-            micWaveSource.RecordingStopped += new EventHandler<StoppedEventArgs>(micWaveSource_RecordingStopped);
-
-            micWaveFile = new WaveFileWriter("2.wav", micWaveSource.WaveFormat);
-            micWaveSource.StartRecording();
-        }
-
-        void sysWaveSource_DataAvailable(object sender, WaveInEventArgs e)
-        {
-            if (sysWaveFile != null)
-            {
-                sysWaveFile.Write(e.Buffer, 0, e.BytesRecorded);
-                sysWaveFile.Flush();
-            }
-        }
-
-        void sysWaveSource_RecordingStopped(object sender, StoppedEventArgs e)
-        {
-            if (sysWaveFile != null)
-            {
-                sysWaveFile.Dispose();
-                sysWaveFile = null;
-            }
-
-            if (sysWaveFile != null)
-            {
-                sysWaveFile.Dispose();
-                sysWaveFile = null;
-            }
-
-        }
-
-        void micWaveSource_DataAvailable(object sender, WaveInEventArgs e)
-        {
-            if (micWaveFile != null)
-            {
-                micWaveFile.Write(e.Buffer, 0, e.BytesRecorded);
-                micWaveFile.Flush();
-            }
-        }
-
-        void micWaveSource_RecordingStopped(object sender, StoppedEventArgs e)
-        {
-            if (micWaveFile != null)
-            {
-                micWaveFile.Dispose();
-                micWaveFile = null;
-            }
-
-            if (micWaveFile != null)
-            {
-                micWaveFile.Dispose();
-                micWaveFile = null;
-            }
-
-        }
+        
 
         private void RecordFrames(IntPtr windHandle)
         {
-            // Check if FullScreen or not.
             int i = 0;
+
+            // Check if FullScreen or not.
             if (checkBox1.Checked)
             {
-                string parentPath = Directory.GetParent(Environment.ProcessPath).FullName + "\\";
-                //Thread job = new Thread(() =>
-                //{
-                Rectangle bounds = Screen.GetBounds(Point.Empty);
-                using (Bitmap bmp = new Bitmap(bounds.Width, bounds.Height))
-                {
-                    GetScreenPicture(bmp, bounds, i++, parentPath);
-                }
-                //});
-                //job.Start();
+                //Recorder.StartFullScreenRecording(allStreams);
+                Recorder.StartFullScreenSimpleRecording();
             }
             else
             {
-                while (isRecording)
-                {
-                    PrintWindow(windHandle).Save($"{i++}.png", ImageFormat.Png);
-                }
+                Recorder.StartWindowScreenRecording(windHandle, allBitmaps);
             }
             
-        }
-
-        private void GetScreenPicture(Bitmap bmp, Rectangle bounds, int indexer, string ParentPath)
-        {
-            //using (Graphics g = Graphics.FromImage(bmp))
-            //{
-            //    g.CopyFromScreen(Point.Empty, Point.Empty, bounds.Size);
-            //}
-            //bmp.Save(ParentPath + $"{indexer}.png", ImageFormat.Png);
-            screenstatelogger = new ScreenStateLogger();
-            screenstatelogger.ScreenRefreshed += (sender, data) =>
-            {
-                //new frame in data
-            };
-            screenstatelogger.Start(allStreams);
         }
 
         // Stop
         private void button2_Click(object sender, EventArgs e)
         {
             isRecording= false;
-            if (micWaveFile != null)
-            {
-                micWaveSource.StopRecording();
-            }
-            if (sysWaveFile != null)
-            {
-                sysWaveSource.StopRecording();
-            }
-            screenstatelogger.Stop();
+            Recorder.StopMicSoundRecording();
+            Recorder.StopSysSoundRecording();
+            Recorder.StopFullScreenRecording();
+            Recorder.StopWindowScreenRecording();
             SaveFullVideo(frmVideoPath, frmFrameRate);
         }
 
@@ -262,22 +147,20 @@ namespace ApplicationRecorderCORE
         private void SaveFullVideo(string videoPath, int frameRate)
         {
             string parentPath = Directory.GetParent(Environment.ProcessPath).FullName + "\\";
-            // Wait for pending operations.
             Thread.Sleep(500);
-            // Write Images so ffmpeg can use them.
-            //var EncoderParamaters = new EncoderParameters(1);
-            //EncoderParamaters.Param[0] = new EncoderParameter(Encoder.Quality, (long)90);
-            //for (int i = 0; i < allPictures.Count; i++)
-            //{
-            //    allPictures[i].Save(parentPath + $"{i}.png", GetEncoderInfo("image/png"), EncoderParamaters);
-            //}
-
             for (int i = 0; i < allStreams.Count; i++)
             {
-                var tempBitmap = new Bitmap(allStreams[i]);
-                tempBitmap.Save(parentPath + $"{i}.png", ImageFormat.Png);
+                allStreams[i].Save(parentPath + $"{i}.png", ImageFormat.Png);
+                allStreams[i].Dispose();
             }
             allStreams.Clear();
+
+            for (int i = 0; i < allBitmaps.Count; i++)
+            {
+                allBitmaps[i].Save(parentPath + $"{i}.png", ImageFormat.Png);
+                allBitmaps[i].Dispose();
+            }
+            allBitmaps.Clear();
 
 
             Process ffmpegProc = new Process();
@@ -296,15 +179,30 @@ namespace ApplicationRecorderCORE
             {
                 ffmpegProc.StartInfo.Arguments
                     =
-                    $"ffmpeg -i 1.wav -i 2.wav -filter_complex \"[0:a][1:a]amerge=inputs=2,pan=stereo|c0<c0+c2|c1<c1+c3[a]\" -map \"[a]\" output.wav";
+                    $".\\ffmpeg -i 1.wav -i 2.wav -filter_complex amix=inputs=2:duration=longest output.wav";
                 ffmpegProc.Start();
                 ffmpegProc.WaitForExit();
             }
-            ffmpegProc.StartInfo.Arguments
+
+            // Now check if there is a created mp4 video file, because of simple recording for example.
+            string[] mp4Files = Directory.GetFiles(parentPath, "*.mp4");
+            if (mp4Files.Length == 1)
+            {
+                ffmpegProc.StartInfo.Arguments
                 =
-                $".\\ffmpeg -framerate {frameRate} -pattern_type sequence -i '%d.png' -i 'output.wav' -c:v libx264 -pix_fmt yuv420p '{videoPath}.mp4'";
-            ffmpegProc.Start();
-            ffmpegProc.WaitForExit();
+                $".\\ffmpeg -i 1.mp4 -i output.wav -c:v copy -c:a aac {videoPath}.mp4";
+                ffmpegProc.Start();
+                ffmpegProc.WaitForExit();
+            }
+            else if (mp4Files.Length == 0)
+            {
+                ffmpegProc.StartInfo.Arguments
+                =
+                $".\\ffmpeg -pattern_type sequence -i '%d.png' -i 'output.wav' -c:v libx264 -pix_fmt yuv420p '{videoPath}.mp4'";
+                ffmpegProc.Start();
+                ffmpegProc.WaitForExit();
+            }
+
             // Delete previous recorded files, If found.
             string[] directoryFiles1 = Directory.GetFiles(parentPath, "*.png");
             foreach (string directoryFile in directoryFiles1)
@@ -316,6 +214,12 @@ namespace ApplicationRecorderCORE
             {
                 File.Delete(directoryFile);
             }
+            string[] directoryFiles3 = Directory.GetFiles(parentPath, "*.mp4");
+            foreach (string directoryFile in directoryFiles3)
+            {
+                if(new FileInfo(directoryFile).Name.Contains("1"))
+                    File.Delete(directoryFile);
+            }
             if (ffmpegProc.ExitCode == 0)
             {
                 MessageBox.Show("Video saved successfully!");
@@ -324,29 +228,7 @@ namespace ApplicationRecorderCORE
 
 
 
-        [DllImport("user32.dll")]
-        public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-        [DllImport("user32.dll")]
-        public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, int nFlags);
-
-        public static Bitmap PrintWindow(IntPtr hwnd)
-        {
-            RECT rc;
-            GetWindowRect(hwnd, out rc);
-
-            Bitmap bmp = new Bitmap(rc.Width, rc.Height, PixelFormat.Format32bppArgb);
-            Graphics gfxBmp = Graphics.FromImage(bmp);
-            IntPtr hdcBitmap = gfxBmp.GetHdc();
-
-            // 2 Value for DirectComposition windows..
-            PrintWindow(hwnd, hdcBitmap, 2);
-
-            gfxBmp.ReleaseHdc(hdcBitmap);
-            gfxBmp.Dispose();
-
-
-            return bmp;
-        }
+        
 
         // Save Settings
         private void button3_Click(object sender, EventArgs e)
@@ -376,137 +258,38 @@ namespace ApplicationRecorderCORE
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
-            if (screenstatelogger != null)
-            {
-                screenstatelogger.Stop();
-            }
+            Recorder.StopMicSoundRecording();
+            Recorder.StopSysSoundRecording();
+            Recorder.StopFullScreenRecording();
+            Recorder.StopWindowScreenRecording();
             isRecording = false;
             Environment.Exit(0);
         }
+
+        private void button4_Click(object sender, EventArgs e)
+        {
+            if (comboBox1.SelectedItem != null && comboBox1.SelectedItem.ToString() != "")
+            {
+                textBox3.Text = string.Format("{0:X8}", new IntPtr(int.Parse(comboBox1.SelectedItem.GetType().GetProperty("Value").GetValue(comboBox1.SelectedItem, null).ToString())));
+            }
+        }
+
+        [HandleProcessCorruptedStateExceptionsAttribute()]
+        private void comboBox1_DropDown(object sender, EventArgs e)
+        {
+            comboBox1.DisplayMember = "Text";
+            comboBox1.ValueMember = "Value";
+            comboBox1.Items.Clear();
+            Process[] processes = Process.GetProcesses();
+            foreach (Process p in processes)
+            {
+                if (!string.IsNullOrEmpty(p.MainWindowTitle))
+                {
+                    comboBox1.Items.Add(new { Text = p.MainWindowTitle, Value = p.MainWindowHandle });
+                }
+            }
+        }
     }
 
-    [StructLayout(LayoutKind.Sequential)]
-    public struct RECT
-    {
-        private int _Left;
-        private int _Top;
-        private int _Right;
-        private int _Bottom;
-
-        public RECT(RECT Rectangle) : this(Rectangle.Left, Rectangle.Top, Rectangle.Right, Rectangle.Bottom)
-        {
-        }
-        public RECT(int Left, int Top, int Right, int Bottom)
-        {
-            _Left = Left;
-            _Top = Top;
-            _Right = Right;
-            _Bottom = Bottom;
-        }
-
-        public int X
-        {
-            get { return _Left; }
-            set { _Left = value; }
-        }
-        public int Y
-        {
-            get { return _Top; }
-            set { _Top = value; }
-        }
-        public int Left
-        {
-            get { return _Left; }
-            set { _Left = value; }
-        }
-        public int Top
-        {
-            get { return _Top; }
-            set { _Top = value; }
-        }
-        public int Right
-        {
-            get { return _Right; }
-            set { _Right = value; }
-        }
-        public int Bottom
-        {
-            get { return _Bottom; }
-            set { _Bottom = value; }
-        }
-        public int Height
-        {
-            get { return _Bottom - _Top; }
-            set { _Bottom = value + _Top; }
-        }
-        public int Width
-        {
-            get { return _Right - _Left; }
-            set { _Right = value + _Left; }
-        }
-        public Point Location
-        {
-            get { return new Point(Left, Top); }
-            set
-            {
-                _Left = value.X;
-                _Top = value.Y;
-            }
-        }
-        public Size Size
-        {
-            get { return new Size(Width, Height); }
-            set
-            {
-                _Right = value.Width + _Left;
-                _Bottom = value.Height + _Top;
-            }
-        }
-
-        public static implicit operator Rectangle(RECT Rectangle)
-        {
-            return new Rectangle(Rectangle.Left, Rectangle.Top, Rectangle.Width, Rectangle.Height);
-        }
-        public static implicit operator RECT(Rectangle Rectangle)
-        {
-            return new RECT(Rectangle.Left, Rectangle.Top, Rectangle.Right, Rectangle.Bottom);
-        }
-        public static bool operator ==(RECT Rectangle1, RECT Rectangle2)
-        {
-            return Rectangle1.Equals(Rectangle2);
-        }
-        public static bool operator !=(RECT Rectangle1, RECT Rectangle2)
-        {
-            return !Rectangle1.Equals(Rectangle2);
-        }
-
-        public override string ToString()
-        {
-            return "{Left: " + _Left + "; " + "Top: " + _Top + "; Right: " + _Right + "; Bottom: " + _Bottom + "}";
-        }
-
-        public override int GetHashCode()
-        {
-            return ToString().GetHashCode();
-        }
-
-        public bool Equals(RECT Rectangle)
-        {
-            return Rectangle.Left == _Left && Rectangle.Top == _Top && Rectangle.Right == _Right && Rectangle.Bottom == _Bottom;
-        }
-
-        public override bool Equals(object Object)
-        {
-            if (Object is RECT)
-            {
-                return Equals((RECT)Object);
-            }
-            else if (Object is Rectangle)
-            {
-                return Equals(new RECT((Rectangle)Object));
-            }
-
-            return false;
-        }
-    }
+    
 }

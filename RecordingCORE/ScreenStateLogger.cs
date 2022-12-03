@@ -2,6 +2,7 @@
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
 using System.Diagnostics;
+using System.Drawing;
 using System.Drawing.Imaging;
 
 namespace ApplicationRecorderCORE
@@ -18,7 +19,8 @@ namespace ApplicationRecorderCORE
 
         }
 
-        public void Start(List<MemoryStream> allStreams)
+        //public void Start(List<MemoryStream> allStreams)
+        public void Start()
         {
             _run = true;
             var factory = new Factory1();
@@ -64,7 +66,7 @@ namespace ApplicationRecorderCORE
                             OutputDuplicateFrameInformation duplicateFrameInformation;
 
                             // Try to get duplicated frame within given time is ms
-                            var result = duplicatedOutput.TryAcquireNextFrame(10, out duplicateFrameInformation, out screenResource);
+                            var result = duplicatedOutput.TryAcquireNextFrame(1, out duplicateFrameInformation, out screenResource);
                             if (result == Result.Ok)
                             {
                                 // copy resource into memory that can be accessed by the CPU
@@ -97,14 +99,8 @@ namespace ApplicationRecorderCORE
                                     bitmap.UnlockBits(mapDest);
                                     device.ImmediateContext.UnmapSubresource(screenTexture, 0);
 
-                                    using (var ms = new MemoryStream())
-                                    {
-                                        bitmap.Save(ms, ImageFormat.Png);
-                                        ms.WriteTo(tempMS);
-                                        allStreams.Add(tempMS);
-                                        ScreenRefreshed?.Invoke(this, ms.ToArray());
-                                        _init = true;
-                                    }
+                                    ScreenRefreshed?.Invoke(this, converterDemo(bitmap));
+                                    _init = true;
                                 }
                                 screenResource.Dispose();
                                 duplicatedOutput.ReleaseFrame();
@@ -125,15 +121,21 @@ namespace ApplicationRecorderCORE
             while (!_init) ;
         }
 
+        public static byte[] converterDemo(Image x)
+        {
+            ImageConverter _imageConverter = new ImageConverter();
+            return (byte[])_imageConverter.ConvertTo(x, typeof(byte[]));
+        }
 
         public void Stop()
         {
             _run = false;
+            Dispose();
         }
 
         public void Dispose()
         {
-            this.Dispose();
+            Dispose();
         }
 
         public EventHandler<byte[]> ScreenRefreshed;
